@@ -1,5 +1,5 @@
 // EstateIQ — AI-powered multi-tenant Real Estate ERP SaaS
-// Prisma schema (PostgreSQL). Every tenant-scoped model carries organizationId.
+// Prisma schema (MySQL / MariaDB). Every tenant-scoped model carries organizationId.
 //
 // Prisma ORM v7: the connection URL lives in prisma.config.ts, and the
 // `prisma-client` generator emits plain TypeScript into src/generated/prisma.
@@ -10,7 +10,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mysql"
 }
 
 // ---------------------------------------------------------------------------
@@ -308,12 +308,12 @@ enum InsightSeverity {
 // ---------------------------------------------------------------------------
 
 model User {
-  id              String     @id @default(uuid(7)) @db.Uuid
+  id              String     @id @default(uuid(7)) @db.Char(36)
   name            String
   email           String     @unique
   emailVerifiedAt DateTime?
   passwordHash    String
-  image           String?
+  image           String? @db.LongText
   phone           String?
   jobTitle        String?
   status          UserStatus @default(ACTIVE)
@@ -358,8 +358,8 @@ model User {
 }
 
 model PasswordResetToken {
-  id        String    @id @default(uuid(7)) @db.Uuid
-  userId    String    @db.Uuid
+  id        String    @id @default(uuid(7)) @db.Char(36)
+  userId    String    @db.Char(36)
   tokenHash String    @unique
   expiresAt DateTime
   usedAt    DateTime?
@@ -376,7 +376,7 @@ model PasswordResetToken {
 // ---------------------------------------------------------------------------
 
 model Organization {
-  id              String             @id @default(uuid(7)) @db.Uuid
+  id              String             @id @default(uuid(7)) @db.Char(36)
   name            String
   slug            String             @unique
   legalName       String?
@@ -387,7 +387,7 @@ model Organization {
   plan            PlanTier           @default(STARTER)
   aiEnabled       Boolean            @default(true)
   suspendedAt     DateTime?
-  suspendedReason String?
+  suspendedReason String? @db.LongText
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
 
@@ -431,23 +431,23 @@ model Organization {
 }
 
 model OrganizationSettings {
-  id                          String       @id @default(uuid(7)) @db.Uuid
-  organizationId              String       @unique @db.Uuid
+  id                          String       @id @default(uuid(7)) @db.Char(36)
+  organizationId              String       @unique @db.Char(36)
   leadSlaHours                Int          @default(24)
   defaultFollowUpType         FollowUpType @default(CALL)
   autoCreateFollowUpOnNewLead Boolean      @default(true)
   aiMonthlyTokenBudget        Int          @default(250000)
   features                    Json?
   // Public Google Sheet the CRM imports leads from (see src/lib/lead-sheet-sync.ts).
-  leadsSheetUrl               String?
+  leadsSheetUrl               String? @db.LongText
   leadsSheetSyncedAt          DateTime?
   // Page tokens are encrypted with FACEBOOK_TOKEN_ENCRYPTION_KEY before storage.
   facebookPageId              String?      @unique
   facebookPageName            String?
-  facebookPageAccessToken     String?
+  facebookPageAccessToken     String? @db.LongText
   facebookLeadsSyncedAt       DateTime?
   // Sales calculator sheet: unit prices and payment-plan defaults (see src/lib/pricing-sheet.ts).
-  pricingSheetUrl             String?
+  pricingSheetUrl             String? @db.LongText
   pricingSheetData            Json?
   pricingSheetSyncedAt        DateTime?
   createdAt                   DateTime     @default(now())
@@ -457,8 +457,8 @@ model OrganizationSettings {
 }
 
 model Subscription {
-  id                     String             @id @default(uuid(7)) @db.Uuid
-  organizationId         String             @unique @db.Uuid
+  id                     String             @id @default(uuid(7)) @db.Char(36)
+  organizationId         String             @unique @db.Char(36)
   plan                   PlanTier           @default(STARTER)
   status                 SubscriptionStatus @default(TRIALING)
   seats                  Int                @default(5)
@@ -477,8 +477,8 @@ model Subscription {
 }
 
 model UsageRecord {
-  id             String      @id @default(uuid(7)) @db.Uuid
-  organizationId String      @db.Uuid
+  id             String      @id @default(uuid(7)) @db.Char(36)
+  organizationId String      @db.Char(36)
   metric         UsageMetric
   quantity       Int         @default(0)
   periodStart    DateTime
@@ -497,10 +497,10 @@ model UsageRecord {
 // ---------------------------------------------------------------------------
 
 model Membership {
-  id             String           @id @default(uuid(7)) @db.Uuid
-  userId         String           @db.Uuid
-  organizationId String           @db.Uuid
-  roleId         String           @db.Uuid
+  id             String           @id @default(uuid(7)) @db.Char(36)
+  userId         String           @db.Char(36)
+  organizationId String           @db.Char(36)
+  roleId         String           @db.Char(36)
   status         MembershipStatus @default(ACTIVE)
   isPrimary      Boolean          @default(false)
   joinedAt       DateTime         @default(now())
@@ -518,11 +518,11 @@ model Membership {
 }
 
 model Role {
-  id             String   @id @default(uuid(7)) @db.Uuid
-  organizationId String   @db.Uuid
+  id             String   @id @default(uuid(7)) @db.Char(36)
+  organizationId String   @db.Char(36)
   name           String
   slug           String
-  description    String?
+  description    String? @db.LongText
   isSystem       Boolean  @default(false)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -537,11 +537,11 @@ model Role {
 }
 
 model Permission {
-  id          String   @id @default(uuid(7)) @db.Uuid
+  id          String   @id @default(uuid(7)) @db.Char(36)
   key         String   @unique
   module      String
   label       String
-  description String?
+  description String? @db.LongText
   createdAt   DateTime @default(now())
 
   roles RolePermission[]
@@ -550,8 +550,8 @@ model Permission {
 }
 
 model RolePermission {
-  roleId       String @db.Uuid
-  permissionId String @db.Uuid
+  roleId       String @db.Char(36)
+  permissionId String @db.Char(36)
 
   role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
   permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
@@ -561,17 +561,17 @@ model RolePermission {
 }
 
 model Invitation {
-  id               String           @id @default(uuid(7)) @db.Uuid
-  organizationId   String           @db.Uuid
+  id               String           @id @default(uuid(7)) @db.Char(36)
+  organizationId   String           @db.Char(36)
   email            String
-  roleId           String           @db.Uuid
+  roleId           String           @db.Char(36)
   tokenHash        String           @unique
   status           InvitationStatus @default(PENDING)
-  invitedById      String?          @db.Uuid
-  createdById      String?          @db.Uuid
+  invitedById      String?          @db.Char(36)
+  createdById      String?          @db.Char(36)
   expiresAt        DateTime
   acceptedAt       DateTime?
-  acceptedByUserId String?          @db.Uuid
+  acceptedByUserId String?          @db.Char(36)
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
 
@@ -589,8 +589,8 @@ model Invitation {
 // ---------------------------------------------------------------------------
 
 model Lead {
-  id                 String               @id @default(uuid(7)) @db.Uuid
-  organizationId     String               @db.Uuid
+  id                 String               @id @default(uuid(7)) @db.Char(36)
+  organizationId     String               @db.Char(36)
   firstName          String
   lastName           String
   phone              String
@@ -601,21 +601,21 @@ model Lead {
   budgetMax          Decimal?             @db.Decimal(18, 2)
   currency           String               @default("EGP") @db.VarChar(3)
   preferredLocation  String?
-  preferredProjectId String?              @db.Uuid
+  preferredProjectId String?              @db.Char(36)
   propertyType       UnitType?
   bedrooms           Int?
   source             LeadSource           @default(OTHER)
-  campaignId         String?              @db.Uuid
+  campaignId         String?              @db.Char(36)
   stage              LeadStage            @default(NEW)
-  assignedToId       String?              @db.Uuid
+  assignedToId       String?              @db.Char(36)
   score              Int                  @default(0)
   temperature        LeadTemperature      @default(COLD)
   priorityScore      Int                  @default(0)
   priorityCategory   LeadPriorityCategory @default(COLD)
-  priorityFactors    String[]             @default([])
+  priorityFactors    Json                 @default("[]")
   priorityComputedAt DateTime?
-  notes              String?
-  lostReason         String?
+  notes              String? @db.LongText
+  lostReason         String? @db.LongText
   nextFollowUpAt     DateTime?
   lastActivityAt     DateTime?
   lastContactedAt    DateTime?
@@ -625,7 +625,7 @@ model Lead {
   // Sheet row) and a hash of its content, so re-syncs only touch changed rows.
   externalRef        String?
   externalHash       String?
-  createdById        String?              @db.Uuid
+  createdById        String?              @db.Char(36)
   createdAt          DateTime             @default(now())
   updatedAt          DateTime             @updatedAt
 
@@ -654,14 +654,14 @@ model Lead {
 }
 
 model LeadActivity {
-  id             String       @id @default(uuid(7)) @db.Uuid
-  organizationId String       @db.Uuid
-  leadId         String       @db.Uuid
-  userId         String?      @db.Uuid
+  id             String       @id @default(uuid(7)) @db.Char(36)
+  organizationId String       @db.Char(36)
+  leadId         String       @db.Char(36)
+  userId         String?      @db.Char(36)
   type           ActivityType
   subject        String
-  body           String?
-  outcome        String?
+  body           String? @db.LongText
+  outcome        String? @db.LongText
   metadata       Json?
   occurredAt     DateTime     @default(now())
   createdAt      DateTime     @default(now())
@@ -676,19 +676,19 @@ model LeadActivity {
 }
 
 model FollowUp {
-  id             String         @id @default(uuid(7)) @db.Uuid
-  organizationId String         @db.Uuid
-  leadId         String         @db.Uuid
-  assignedToId   String         @db.Uuid
+  id             String         @id @default(uuid(7)) @db.Char(36)
+  organizationId String         @db.Char(36)
+  leadId         String         @db.Char(36)
+  assignedToId   String         @db.Char(36)
   type           FollowUpType   @default(CALL)
   dueAt          DateTime
   status         FollowUpStatus @default(PENDING)
   priority       Priority       @default(MEDIUM)
-  notes          String?
-  outcome        String?
+  notes          String? @db.LongText
+  outcome        String? @db.LongText
   completedAt    DateTime?
-  completedById  String?        @db.Uuid
-  createdById    String?        @db.Uuid
+  completedById  String?        @db.Char(36)
+  createdById    String?        @db.Char(36)
   reminderSentAt DateTime?
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
@@ -706,8 +706,8 @@ model FollowUp {
 }
 
 model Campaign {
-  id             String           @id @default(uuid(7)) @db.Uuid
-  organizationId String           @db.Uuid
+  id             String           @id @default(uuid(7)) @db.Char(36)
+  organizationId String           @db.Char(36)
   name           String
   platform       CampaignPlatform
   cost           Decimal          @default(0) @db.Decimal(18, 2)
@@ -716,8 +716,8 @@ model Campaign {
   endDate        DateTime?
   status         CampaignStatus   @default(DRAFT)
   externalId     String?
-  notes          String?
-  createdById    String?          @db.Uuid
+  notes          String? @db.LongText
+  createdById    String?          @db.Char(36)
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
 
@@ -735,23 +735,23 @@ model Campaign {
 // ---------------------------------------------------------------------------
 
 model Project {
-  id                   String        @id @default(uuid(7)) @db.Uuid
-  organizationId       String        @db.Uuid
+  id                   String        @id @default(uuid(7)) @db.Char(36)
+  organizationId       String        @db.Char(36)
   name                 String
   code                 String?
   developer            String?
   locationCity         String?
   locationCountry      String?
-  address              String?
-  description          String?
+  address              String? @db.LongText
+  description          String? @db.LongText
   status               ProjectStatus @default(PLANNED)
   launchDate           DateTime?
   expectedDeliveryDate DateTime?
   currency             String        @default("EGP") @db.VarChar(3)
   startingPrice        Decimal?      @db.Decimal(18, 2)
   totalUnits           Int           @default(0)
-  coverImageUrl        String?
-  createdById          String?       @db.Uuid
+  coverImageUrl        String? @db.LongText
+  createdById          String?       @db.Char(36)
   createdAt            DateTime      @default(now())
   updatedAt            DateTime      @updatedAt
 
@@ -769,13 +769,13 @@ model Project {
 }
 
 model Building {
-  id             String   @id @default(uuid(7)) @db.Uuid
-  organizationId String   @db.Uuid
-  projectId      String   @db.Uuid
+  id             String   @id @default(uuid(7)) @db.Char(36)
+  organizationId String   @db.Char(36)
+  projectId      String   @db.Char(36)
   name           String
   code           String?
   floors         Int      @default(0)
-  description    String?
+  description    String? @db.LongText
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -789,10 +789,10 @@ model Building {
 }
 
 model Unit {
-  id              String        @id @default(uuid(7)) @db.Uuid
-  organizationId  String        @db.Uuid
-  projectId       String        @db.Uuid
-  buildingId      String?       @db.Uuid
+  id              String        @id @default(uuid(7)) @db.Char(36)
+  organizationId  String        @db.Char(36)
+  projectId       String        @db.Char(36)
+  buildingId      String?       @db.Char(36)
   unitCode        String
   floor           Int?
   type            UnitType
@@ -806,8 +806,8 @@ model Unit {
   finishing       FinishingType @default(SEMI_FINISHED)
   availableFrom   DateTime?
   statusChangedAt DateTime      @default(now())
-  notes           String?
-  createdById     String?       @db.Uuid
+  notes           String? @db.LongText
+  createdById     String?       @db.Char(36)
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
@@ -833,21 +833,21 @@ model Unit {
 // ---------------------------------------------------------------------------
 
 model Reservation {
-  id             String            @id @default(uuid(7)) @db.Uuid
-  organizationId String            @db.Uuid
-  leadId         String            @db.Uuid
-  unitId         String            @db.Uuid
-  salespersonId  String            @db.Uuid
+  id             String            @id @default(uuid(7)) @db.Char(36)
+  organizationId String            @db.Char(36)
+  leadId         String            @db.Char(36)
+  unitId         String            @db.Char(36)
+  salespersonId  String            @db.Char(36)
   reservedAt     DateTime          @default(now())
   expiresAt      DateTime
   amount         Decimal           @db.Decimal(18, 2)
   currency       String            @default("EGP") @db.VarChar(3)
   status         ReservationStatus @default(ACTIVE)
-  notes          String?
+  notes          String? @db.LongText
   confirmedAt    DateTime?
   cancelledAt    DateTime?
-  cancelReason   String?
-  createdById    String?           @db.Uuid
+  cancelReason   String? @db.LongText
+  createdById    String?           @db.Char(36)
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
 
@@ -866,13 +866,13 @@ model Reservation {
 }
 
 model Sale {
-  id             String     @id @default(uuid(7)) @db.Uuid
-  organizationId String     @db.Uuid
+  id             String     @id @default(uuid(7)) @db.Char(36)
+  organizationId String     @db.Char(36)
   reference      String
-  leadId         String     @db.Uuid
-  unitId         String     @db.Uuid
-  reservationId  String?    @unique @db.Uuid
-  salespersonId  String     @db.Uuid
+  leadId         String     @db.Char(36)
+  unitId         String     @db.Char(36)
+  reservationId  String?    @unique @db.Char(36)
+  salespersonId  String     @db.Char(36)
   salePrice      Decimal    @db.Decimal(18, 2)
   discount       Decimal    @default(0) @db.Decimal(18, 2)
   contractValue  Decimal    @db.Decimal(18, 2)
@@ -881,10 +881,10 @@ model Sale {
   commissionAmount Decimal? @db.Decimal(18, 2)
   saleDate       DateTime
   status         SaleStatus @default(DRAFT)
-  approvedById   String?    @db.Uuid
+  approvedById   String?    @db.Char(36)
   approvedAt     DateTime?
-  notes          String?
-  createdById    String?    @db.Uuid
+  notes          String? @db.LongText
+  createdById    String?    @db.Char(36)
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
 
@@ -908,16 +908,16 @@ model Sale {
 }
 
 model PaymentPlan {
-  id                 String   @id @default(uuid(7)) @db.Uuid
-  organizationId     String   @db.Uuid
-  saleId             String   @unique @db.Uuid
+  id                 String   @id @default(uuid(7)) @db.Char(36)
+  organizationId     String   @db.Char(36)
+  saleId             String   @unique @db.Char(36)
   totalAmount        Decimal  @db.Decimal(18, 2)
   downPayment        Decimal  @default(0) @db.Decimal(18, 2)
   installmentsCount  Int
   startDate          DateTime
   currency           String   @default("EGP") @db.VarChar(3)
-  notes              String?
-  createdById        String?  @db.Uuid
+  notes              String? @db.LongText
+  createdById        String?  @db.Char(36)
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
@@ -930,9 +930,9 @@ model PaymentPlan {
 }
 
 model Installment {
-  id             String            @id @default(uuid(7)) @db.Uuid
-  organizationId String            @db.Uuid
-  paymentPlanId  String            @db.Uuid
+  id             String            @id @default(uuid(7)) @db.Char(36)
+  organizationId String            @db.Char(36)
+  paymentPlanId  String            @db.Char(36)
   sequence       Int
   amount         Decimal           @db.Decimal(18, 2)
   paidAmount     Decimal           @default(0) @db.Decimal(18, 2)
@@ -953,18 +953,18 @@ model Installment {
 }
 
 model Payment {
-  id             String        @id @default(uuid(7)) @db.Uuid
-  organizationId String        @db.Uuid
-  saleId         String        @db.Uuid
-  installmentId  String?       @db.Uuid
-  leadId         String?       @db.Uuid
+  id             String        @id @default(uuid(7)) @db.Char(36)
+  organizationId String        @db.Char(36)
+  saleId         String        @db.Char(36)
+  installmentId  String?       @db.Char(36)
+  leadId         String?       @db.Char(36)
   amount         Decimal       @db.Decimal(18, 2)
   currency       String        @default("EGP") @db.VarChar(3)
   paidAt         DateTime      @default(now())
   method         PaymentMethod @default(CASH)
   reference      String?
-  notes          String?
-  receivedById   String?       @db.Uuid
+  notes          String? @db.LongText
+  receivedById   String?       @db.Char(36)
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
@@ -981,8 +981,8 @@ model Payment {
 }
 
 model ExchangeRate {
-  id             String   @id @default(uuid(7)) @db.Uuid
-  organizationId String   @db.Uuid
+  id             String   @id @default(uuid(7)) @db.Char(36)
+  organizationId String   @db.Char(36)
   baseCurrency   String   @db.VarChar(3)
   quoteCurrency  String   @db.VarChar(3)
   rate           Decimal  @db.Decimal(18, 8)
@@ -1001,15 +1001,15 @@ model ExchangeRate {
 // ---------------------------------------------------------------------------
 
 model Notification {
-  id             String           @id @default(uuid(7)) @db.Uuid
-  organizationId String           @db.Uuid
-  userId         String           @db.Uuid
+  id             String           @id @default(uuid(7)) @db.Char(36)
+  organizationId String           @db.Char(36)
+  userId         String           @db.Char(36)
   type           NotificationType
   title          String
-  body           String?
+  body           String? @db.LongText
   entityType     String?
   entityId       String?
-  link           String?
+  link           String? @db.LongText
   metadata       Json?
   readAt         DateTime?
   createdAt      DateTime         @default(now())
@@ -1023,16 +1023,16 @@ model Notification {
 }
 
 model AuditLog {
-  id             String   @id @default(uuid(7)) @db.Uuid
-  organizationId String?  @db.Uuid
-  userId         String?  @db.Uuid
+  id             String   @id @default(uuid(7)) @db.Char(36)
+  organizationId String?  @db.Char(36)
+  userId         String?  @db.Char(36)
   actorEmail     String?
   action         String
   entityType     String
   entityId       String?
   metadata       Json?
   ipAddress      String?
-  userAgent      String?
+  userAgent      String? @db.LongText
   createdAt      DateTime @default(now())
 
   organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -1045,17 +1045,17 @@ model AuditLog {
 }
 
 model AutomationRule {
-  id             String           @id @default(uuid(7)) @db.Uuid
-  organizationId String           @db.Uuid
+  id             String           @id @default(uuid(7)) @db.Char(36)
+  organizationId String           @db.Char(36)
   name           String
-  description    String?
+  description    String? @db.LongText
   event          AutomationEvent
   conditions     Json             @default("{}")
   actions        Json             @default("[]")
   enabled        Boolean          @default(true)
   lastRunAt      DateTime?
   runCount       Int              @default(0)
-  createdById    String?          @db.Uuid
+  createdById    String?          @db.Char(36)
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
 
@@ -1068,15 +1068,15 @@ model AutomationRule {
 }
 
 model AutomationExecution {
-  id             String            @id @default(uuid(7)) @db.Uuid
-  organizationId String            @db.Uuid
-  ruleId         String?           @db.Uuid
+  id             String            @id @default(uuid(7)) @db.Char(36)
+  organizationId String            @db.Char(36)
+  ruleId         String?           @db.Char(36)
   event          AutomationEvent
   status         AutomationStatus
   entityType     String?
   entityId       String?
   result         Json?
-  error          String?
+  error          String? @db.LongText
   startedAt      DateTime          @default(now())
   finishedAt     DateTime?
 
@@ -1093,9 +1093,9 @@ model AutomationExecution {
 // ---------------------------------------------------------------------------
 
 model AIConversation {
-  id             String   @id @default(uuid(7)) @db.Uuid
-  organizationId String   @db.Uuid
-  userId         String   @db.Uuid
+  id             String   @id @default(uuid(7)) @db.Char(36)
+  organizationId String   @db.Char(36)
+  userId         String   @db.Char(36)
   title          String
   archivedAt     DateTime?
   createdAt      DateTime @default(now())
@@ -1110,12 +1110,12 @@ model AIConversation {
 }
 
 model AIMessage {
-  id             String        @id @default(uuid(7)) @db.Uuid
-  organizationId String        @db.Uuid
-  conversationId String        @db.Uuid
-  userId         String?       @db.Uuid
+  id             String        @id @default(uuid(7)) @db.Char(36)
+  organizationId String        @db.Char(36)
+  conversationId String        @db.Char(36)
+  userId         String?       @db.Char(36)
   role           AIMessageRole
-  content        String
+  content        String @db.LongText
   toolName       String?
   toolInput      Json?
   toolOutput     Json?
@@ -1136,12 +1136,12 @@ model AIMessage {
 }
 
 model AIInsight {
-  id             String          @id @default(uuid(7)) @db.Uuid
-  organizationId String          @db.Uuid
+  id             String          @id @default(uuid(7)) @db.Char(36)
+  organizationId String          @db.Char(36)
   type           InsightType
   severity       InsightSeverity @default(INFO)
   title          String
-  summary        String
+  summary        String @db.LongText
   data           Json
   entityType     String?
   entityId       String?
@@ -1150,7 +1150,7 @@ model AIInsight {
   dedupeKey      String
   generatedAt    DateTime        @default(now())
   dismissedAt    DateTime?
-  dismissedById  String?         @db.Uuid
+  dismissedById  String?         @db.Char(36)
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 

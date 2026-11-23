@@ -1,4 +1,4 @@
-import { PrismaPg } from "@prisma/adapter-pg";
+import { PrismaMariaDb } from "@prisma/adapter-mariadb";
 import { PrismaClient } from "@/generated/prisma/client";
 import { env } from "./env";
 import { tenantGuardExtension } from "./tenant";
@@ -15,7 +15,7 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 function createPrismaClient(): PrismaClient {
-  const adapter = new PrismaPg({ connectionString: env.databaseUrl });
+  const adapter = new PrismaMariaDb(env.databaseUrl);
   return new PrismaClient({
     adapter,
     log:

@@ -18,6 +18,7 @@ next-env.d.ts
 # local dev database (embedded postgres cluster + logs)
 /.pgdata/
 /.pgdata-test/
+/.mysql-data/
 *.log
 
 # generated prisma client

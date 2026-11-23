@@ -650,7 +650,7 @@ export async function syncLeadsFromSheet(input: {
       });
       // Feedback columns are owned by the sheet: replace the previous copies.
       await tx.leadActivity.deleteMany({
-        where: { leadId: existing.id, type: "NOTE", metadata: { path: ["source"], equals: ACTIVITY_SOURCE } },
+        where: { leadId: existing.id, type: "NOTE", metadata: { path: "$.source", equals: ACTIVITY_SOURCE } },
       });
       await tx.leadActivity.createMany({
         data: [

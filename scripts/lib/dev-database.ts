@@ -1,163 +1,87 @@
-import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { spawn, spawnSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-import pg from "pg";
-import { DEV_DB, EMBEDDED_PG_PASSWORD, EMBEDDED_PG_USER } from "./dev-db-config";
+import mariadb from "mariadb";
+import { mariaDbDriverUrl } from "../../src/lib/mysql";
+import { DEV_DB, testDatabaseUrl } from "./dev-db-config";
 
 export { DEV_DB, databaseUrl, testDatabaseUrl } from "./dev-db-config";
 
-/**
- * Local development/CI PostgreSQL cluster.
- *
- * The `embedded-postgres` package ships the official PostgreSQL binaries for
- * the current platform; this module drives those binaries directly through
- * `initdb` / `pg_ctl` so the server runs as an independent background process
- * (no keep-alive wrapper, no Docker, no system-wide install).
- */
-
-export function platformPackageName(): string {
-  const platform = process.platform === "win32" ? "windows" : process.platform;
-  const arch = process.arch === "x64" ? "x64" : process.arch;
-  return `@embedded-postgres/${platform}-${arch}`;
+function binaryPath(name: string): string {
+  const directory = process.env.MYSQL_BIN_DIR;
+  if (!directory) throw new Error("Set MYSQL_BIN_DIR to your MariaDB bin directory, or set TEST_DATABASE_URL to a running test database.");
+  const binary = path.resolve(directory, process.platform === "win32" ? `${name}.exe` : name);
+  if (!existsSync(binary)) throw new Error(`The MariaDB ${name} executable is missing from MYSQL_BIN_DIR.`);
+  return binary;
 }
 
-export function binaryDir(): string {
-  return path.resolve(process.cwd(), "node_modules", platformPackageName(), "native", "bin");
+export function isClusterInitialised(): boolean {
+  return existsSync(path.join(DEV_DB.dir, "mysql"));
 }
 
-export function binaryPath(name: string): string {
-  const exe = process.platform === "win32" ? `${name}.exe` : name;
-  return path.join(binaryDir(), exe);
-}
-
-export function logFilePath(): string {
-  return path.resolve(process.cwd(), "pg.log");
-}
-
-export function isClusterInitialised(databaseDir: string = DEV_DB.dir): boolean {
-  return existsSync(path.join(databaseDir, "PG_VERSION"));
-}
-
-export function runningPid(databaseDir: string = DEV_DB.dir): number | null {
-  const pidFile = path.join(databaseDir, "postmaster.pid");
+export function runningPid(): number | null {
+  const pidFile = path.join(DEV_DB.dir, "server.pid");
   if (!existsSync(pidFile)) return null;
-  const [firstLine] = readFileSync(pidFile, "utf8").split("\n");
-  const pid = Number.parseInt(firstLine ?? "", 10);
-  return Number.isFinite(pid) ? pid : null;
+  const pid = Number(readFileSync(pidFile, "utf8").trim());
+  return Number.isInteger(pid) && pid > 0 ? pid : null;
 }
 
-export function isServerRunning(databaseDir: string = DEV_DB.dir): boolean {
-  const pid = runningPid(databaseDir);
+export function isServerRunning(): boolean {
+  const pid = runningPid();
   if (!pid) return false;
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
+  try { process.kill(pid, 0); return true; } catch { return false; }
 }
 
-export interface RunResult {
-  status: number | null;
-  stdout: string;
-  stderr: string;
+async function connectLocal() {
+  return mariadb.createConnection({ host: "127.0.0.1", port: DEV_DB.port, user: DEV_DB.user, password: DEV_DB.password, connectTimeout: 2000 });
 }
 
-export function runBinary(
-  name: string,
-  args: string[],
-  options: { cwd?: string } = {},
-): RunResult {
-  const result = spawnSync(binaryPath(name), args, {
-    cwd: options.cwd ?? binaryDir(),
-    encoding: "utf8",
-    windowsHide: true,
-  });
-  return { status: result.status, stdout: result.stdout ?? "", stderr: result.stderr ?? "" };
-}
-
-function initialiseCluster(databaseDir: string): void {
-  mkdirSync(databaseDir, { recursive: true });
-  const result = runBinary("initdb", [
-    "-D",
-    databaseDir,
-    "-U",
-    EMBEDDED_PG_USER,
-    "-A",
-    "trust",
-    "-E",
-    "UTF8",
-  ]);
-  if (result.status !== 0) {
-    throw new Error(`initdb failed:\n${result.stdout}\n${result.stderr}`);
-  }
-}
-
-function startServer(databaseDir: string): void {
-  const result = runBinary("pg_ctl", [
-    "-D",
-    databaseDir,
-    "-l",
-    logFilePath(),
-    "-o",
-    `-p ${DEV_DB.port}`,
-    "-w",
-    "-t",
-    "60",
-    "start",
-  ]);
-  if (result.status !== 0) {
-    throw new Error(`pg_ctl start failed:\n${result.stdout}\n${result.stderr}`);
-  }
-}
-
-async function createDatabaseIfMissing(database: string): Promise<boolean> {
-  const client = new pg.Client({
-    host: "127.0.0.1",
-    port: DEV_DB.port,
-    user: EMBEDDED_PG_USER,
-    password: EMBEDDED_PG_PASSWORD,
-    database: "postgres",
-  });
-  await client.connect();
-  try {
-    const existing = await client.query("SELECT 1 FROM pg_database WHERE datname = $1", [
-      database,
-    ]);
-    if (existing.rowCount) return false;
-    await client.query(`CREATE DATABASE "${database.replace(/"/g, "")}"`);
-    return true;
-  } finally {
-    await client.end();
-  }
-}
-
-/**
- * Boots (or reuses) the cluster and makes sure the requested databases exist.
- */
-export async function ensureCluster(
-  databases: string[] = [DEV_DB.database],
-  databaseDir: string = DEV_DB.dir,
-): Promise<{ started: boolean; created: string[] }> {
-  if (!isClusterInitialised(databaseDir)) {
-    initialiseCluster(databaseDir);
-  }
+export async function ensureCluster(databases: string[] = [DEV_DB.database]): Promise<{ started: boolean; created: string[] }> {
   let started = false;
-  if (!isServerRunning(databaseDir)) {
-    startServer(databaseDir);
+  if (!isClusterInitialised()) {
+    if (process.platform !== "win32") throw new Error("Start a local MySQL/MariaDB server and set TEST_DATABASE_URL. Automatic portable initialization currently supports Windows.");
+    const result = spawnSync(binaryPath("mariadb-install-db"), [`--datadir=${DEV_DB.dir}`, `--password=${DEV_DB.password}`, `--port=${DEV_DB.port}`, "--silent"], { windowsHide: true, encoding: "utf8" });
+    if (result.status !== 0) throw new Error("Local MariaDB initialization failed. Check MYSQL_BIN_DIR and the data directory permissions.");
+  }
+  if (!isServerRunning()) {
+    const child = spawn(binaryPath("mariadbd"), [
+      "--no-defaults", `--datadir=${DEV_DB.dir}`, `--port=${DEV_DB.port}`,
+      "--bind-address=127.0.0.1", `--pid-file=${path.join(DEV_DB.dir, "server.pid")}`,
+      `--log-error=${path.join(DEV_DB.dir, "server.log")}`, "--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci",
+    ], { detached: true, stdio: "ignore", windowsHide: true });
+    const launchError = new Promise<never>((_, reject) => child.once("error", () => reject(new Error("Local MariaDB could not be started."))));
+    child.unref();
+    const ready = async () => {
+      for (let attempt = 0; attempt < 30; attempt++) {
+        try { const connection = await connectLocal(); await connection.end(); return; } catch { await new Promise((resolve) => setTimeout(resolve, 500)); }
+      }
+      throw new Error("Local MariaDB did not become ready. Check .mysql-data/server.log.");
+    };
+    await Promise.race([ready(), launchError]);
     started = true;
   }
+  const connection = await connectLocal();
   const created: string[] = [];
-  for (const database of databases) {
-    if (await createDatabaseIfMissing(database)) created.push(database);
-  }
+  try {
+    for (const database of databases) {
+      if (!/^[a-zA-Z0-9_]+$/.test(database)) throw new Error("Invalid local database name.");
+      const found = await connection.query("SELECT SCHEMA_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = ?", [database]);
+      if (found.length) continue;
+      await connection.query(`CREATE DATABASE \`${database}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
+      created.push(database);
+    }
+  } finally { await connection.end(); }
   return { started, created };
 }
 
-export function stopCluster(databaseDir: string = DEV_DB.dir): RunResult {
-  if (!isClusterInitialised(databaseDir)) {
-    return { status: 0, stdout: "cluster not initialised", stderr: "" };
-  }
-  return runBinary("pg_ctl", ["-D", databaseDir, "-m", "fast", "-w", "stop"]);
+export async function ensureTestDatabase(): Promise<void> {
+  if (!process.env.TEST_DATABASE_URL) { await ensureCluster([DEV_DB.testDatabase]); return; }
+  const connection = await mariadb.createConnection(mariaDbDriverUrl(testDatabaseUrl()));
+  try { await connection.query("SELECT 1"); } finally { await connection.end(); }
 }
 
+export async function stopCluster(): Promise<void> {
+  if (!isServerRunning()) return;
+  const connection = await connectLocal();
+  try { await connection.query("SHUTDOWN"); } finally { await connection.end(); }
+}

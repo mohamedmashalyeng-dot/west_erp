@@ -1,15 +1,15 @@
 import { spawnSync } from "node:child_process";
-import { DEV_DB, ensureCluster, testDatabaseUrl } from "../../scripts/lib/dev-database";
+import { ensureTestDatabase, testDatabaseUrl } from "../../scripts/lib/dev-database";
 
 /**
- * Boots the embedded PostgreSQL cluster used by the integration tests and
+ * Connects to a dedicated MySQL/MariaDB test database and
  * applies migrations to the dedicated test database.
  *
- * The test database URL is injected into the test workers through
- * `test.env` in vitest.config.ts, so tests never touch the dev database.
+ * Test files use testDatabaseUrl() before importing Prisma. It rejects names
+ * that are not explicitly test databases and never uses production DATABASE_URL.
  */
 export async function setup(): Promise<void> {
-  await ensureCluster([DEV_DB.testDatabase]);
+  await ensureTestDatabase();
 
   const url = testDatabaseUrl();
   const result = spawnSync("npx prisma migrate deploy", {

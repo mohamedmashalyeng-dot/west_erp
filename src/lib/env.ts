@@ -32,7 +32,11 @@ function intFromEnv(name: string, fallback: number): number {
 
 export const env = {
   get databaseUrl(): string {
-    return requireEnv("DATABASE_URL");
+    const value = requireEnv("DATABASE_URL").trim();
+    if (!value.startsWith("mysql://")) {
+      throw new Error("DATABASE_URL must use mysql:// for this MySQL/MariaDB build.");
+    }
+    return value;
   },
   get authSecret(): string {
     return read("AUTH_SECRET") ?? "insecure-development-secret-do-not-use-in-production";

@@ -4,7 +4,7 @@ The integration imports available submissions from all lead forms on one Faceboo
 
 ## Server setup
 
-1. Run `npm ci`, `npm run db:generate`, and `npm run db:deploy` with the deployment's `DATABASE_URL` configured.
+1. Configure a MySQL/MariaDB `DATABASE_URL`. For an existing imported database, follow [the MySQL deployment guide](./mysql-deployment.md) before deployment so its existing data is preserved. Run `npm ci`, `npm run db:generate`, and `npm run db:deploy` only after the baseline has been verified or on an empty application database.
 2. Set `APP_URL` to your public HTTPS application URL.
 3. Set `FACEBOOK_APP_SECRET` to your Meta app secret.
 4. Generate a random `FACEBOOK_WEBHOOK_VERIFY_TOKEN` and a separate `FACEBOOK_TOKEN_ENCRYPTION_KEY`. Generate each with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`. The encryption key must have exactly 64 hexadecimal characters. Store it securely and keep it stable across instances and deploys; rotating it requires reconnecting the Pages.
