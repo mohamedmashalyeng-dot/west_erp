@@ -441,6 +441,11 @@ model OrganizationSettings {
   // Public Google Sheet the CRM imports leads from (see src/lib/lead-sheet-sync.ts).
   leadsSheetUrl               String?
   leadsSheetSyncedAt          DateTime?
+  // Page tokens are encrypted with FACEBOOK_TOKEN_ENCRYPTION_KEY before storage.
+  facebookPageId              String?      @unique
+  facebookPageName            String?
+  facebookPageAccessToken     String?
+  facebookLeadsSyncedAt       DateTime?
   // Sales calculator sheet: unit prices and payment-plan defaults (see src/lib/pricing-sheet.ts).
   pricingSheetUrl             String?
   pricingSheetData            Json?
