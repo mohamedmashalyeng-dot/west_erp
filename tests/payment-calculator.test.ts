@@ -180,6 +180,9 @@ describe("savePaymentPlanAction", () => {
   });
 
   afterAll(async () => {
+    // MySQL checks RESTRICT immediately while cascading an organization delete.
+    // Remove this test's sales before the organization cascades to its leads.
+    await prisma.sale.deleteMany({ where: { organizationId } });
     await prisma.organization.delete({ where: { id: organizationId } });
     await prisma.user.deleteMany({ where: { email: { endsWith: `${suffix}@example.test` } } });
     await prisma.$disconnect();

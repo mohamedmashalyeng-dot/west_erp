@@ -1,4 +1,4 @@
-import "dotenv/config";
+import "./scripts/lib/load-env";
 import { defineConfig, env } from "prisma/config";
 
 /**
@@ -14,8 +14,6 @@ export default defineConfig({
     seed: "tsx prisma/seed.ts",
   },
   datasource: {
-    // Migrations need a direct connection; Neon's Vercel integration exposes
-    // it as DATABASE_URL_UNPOOLED next to the pooled DATABASE_URL.
-    url: process.env.DATABASE_URL_UNPOOLED || env("DATABASE_URL"),
+    url: env("DATABASE_URL"),
   },
 });

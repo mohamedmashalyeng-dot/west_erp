@@ -15,7 +15,7 @@
  *
  * Usage: npm run db:bootstrap
  */
-import "dotenv/config";
+import "./lib/load-env";
 import bcrypt from "bcryptjs";
 import { prisma } from "../src/lib/prisma";
 import { seedPermissionCatalogue, seedSystemRoles } from "../prisma/seed/01-core";

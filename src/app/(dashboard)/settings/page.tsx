@@ -7,6 +7,9 @@ import { hasPermission } from "@/lib/permissions";
 import { formatDate, formatDateTime, formatNumber } from "@/lib/format";
 import { savePricingSheetUrlAction, saveLeadsSheetUrlAction } from "./actions";
 import { SheetLinkForm } from "./sheet-link-form";
+import { FacebookConnectionForm } from "./facebook-connection-form";
+import { missingFacebookConfiguration } from "@/lib/facebook";
+import { env } from "@/lib/env";
 
 export const metadata = { title: "Settings" };
 
@@ -46,6 +49,27 @@ export default async function SettingsPage() {
               { label: "Auto Follow-up", value: settings?.autoCreateFollowUpOnNewLead ? "Enabled" : "Disabled" },
               { label: "Token Budget", value: formatNumber(settings?.aiMonthlyTokenBudget ?? 0) },
             ]}
+          />
+        </CardContent>
+      </Card>
+
+      <Card id="facebook">
+        <CardHeader>
+          <CardTitle>Facebook Lead Ads</CardTitle>
+          <CardDescription>
+            Receive new form submissions automatically and import available leads using &quot;Sync Facebook&quot; on the Leads page.
+            {settings?.facebookLeadsSyncedAt ? ` Last synced: ${formatDateTime(settings.facebookLeadsSyncedAt)}.` : ""}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            In your Meta app, configure a Page webhook for the leadgen field. Callback URL: <code className="break-all">{new URL("/api/webhooks/facebook", env.appUrl).toString()}</code>.
+            Use the verify token configured by your server administrator. The callback must use a public HTTPS address.
+          </p>
+          <FacebookConnectionForm
+            pageId={settings?.facebookPageId ?? null}
+            pageName={settings?.facebookPageName ?? null}
+            missingConfiguration={missingFacebookConfiguration()}
           />
         </CardContent>
       </Card>

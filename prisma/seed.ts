@@ -1,4 +1,4 @@
-import "dotenv/config";
+import "../scripts/lib/load-env";
 import bcrypt from "bcryptjs";
 import { prisma } from "../src/lib/prisma";
 import { seedCoreIdentity } from "./seed/01-core";

@@ -1,12 +1,12 @@
 /**
  * Temporary end-to-end smoke check for the data layer:
- *   - Prisma 7 driver adapter against the embedded PostgreSQL cluster
+ *   - Prisma 7 driver adapter against a MySQL/MariaDB development database
  *   - tenant guard injection + fail-closed cross-tenant blocking
  *   - Decimal / enum / uuid(7) round-trips
  *
  * Usage: npx tsx scripts/db-smoke.ts
  */
-import "dotenv/config";
+import "./lib/load-env";
 import { forOrganization, prisma } from "../src/lib/prisma";
 import { TenantIsolationError } from "../src/lib/tenant";
 

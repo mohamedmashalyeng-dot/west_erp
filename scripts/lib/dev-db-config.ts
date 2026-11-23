@@ -1,27 +1,25 @@
-import "dotenv/config";
+import "./load-env";
 import path from "node:path";
 
-/**
- * Shared, dependency-free configuration for the local embedded PostgreSQL
- * cluster used by `npm run db:start` and by the integration test suite.
- *
- * Production deployments never use this: they point DATABASE_URL at a managed
- * PostgreSQL instance.
- */
-export const EMBEDDED_PG_USER = "postgres";
-export const EMBEDDED_PG_PASSWORD = "password";
-
 export const DEV_DB = {
-  port: Number(process.env.DEV_DATABASE_PORT ?? 5433),
-  dir: path.resolve(process.cwd(), process.env.DEV_DATABASE_DIR ?? ".pgdata"),
+  port: Number(process.env.DEV_DATABASE_PORT ?? 3307),
+  dir: path.resolve(process.cwd(), process.env.DEV_DATABASE_DIR ?? ".mysql-data"),
   database: process.env.DEV_DATABASE_NAME ?? "estateiq",
   testDatabase: process.env.TEST_DATABASE_NAME ?? "estateiq_test",
+  user: process.env.DEV_DATABASE_USER ?? "root",
+  password: process.env.DEV_DATABASE_PASSWORD ?? "password",
 };
 
 export function databaseUrl(database: string, port = DEV_DB.port): string {
-  return `postgresql://${EMBEDDED_PG_USER}:${EMBEDDED_PG_PASSWORD}@127.0.0.1:${port}/${database}?schema=public`;
+  return `mysql://${encodeURIComponent(DEV_DB.user)}:${encodeURIComponent(DEV_DB.password)}@127.0.0.1:${port}/${encodeURIComponent(database)}`;
 }
 
 export function testDatabaseUrl(): string {
-  return databaseUrl(DEV_DB.testDatabase);
+  const value = process.env.TEST_DATABASE_URL || databaseUrl(DEV_DB.testDatabase);
+  const parsed = new URL(value);
+  const name = decodeURIComponent(parsed.pathname.slice(1));
+  if (parsed.protocol !== "mysql:" || !/^(test_.+|.+_test)$/.test(name)) {
+    throw new Error("Tests require a mysql:// URL whose database name starts with test_ or ends with _test.");
+  }
+  return value;
 }
